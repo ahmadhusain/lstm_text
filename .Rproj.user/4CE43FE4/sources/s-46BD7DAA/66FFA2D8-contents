@@ -1,0 +1,177 @@
+---
+title: "Belajar Analisa Data Menggunakan R"
+author: "Adi Sutrisno"
+date: "9/15/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## DATA SOURCE
+
+Data yang digunakan untuk latihan analisa data menggunakan program R ini merupakan data yang bersumber dari team Algoritma yang telah sedikit kita dimodifikasi. Data masternya menggunakan file excel.
+
+```{r}
+library(readxl)
+library(dplyr)
+```
+
+
+```{r, warning=FALSE}
+retail <- read_excel("latihan.xlsx")
+```
+
+Berikut adalah gambaran datanya :
+
+```{r}
+str(retail)
+```
+```{r}
+retail <- retail %>% 
+mutate(Sales = as.numeric(Sales)) 
+```
+
+
+## DATA ANALYSIS
+   
+   Analisa data dilakukan terhadap tiga parameter yaitu nilai sales, profit dan margin.  Ketiga parameter ini sangat penting dan memiliki hubungan keterkaitan satu sama lain. Berikut merupakan nilai sales, profit dan margin dari tiap category yang diurutkan berdasarkan sales tertinggi  :
+    
+```{r}
+category.profit <- retail%>% 
+    group_by(Category) %>% 
+  summarise(Profit = sum(Profit), 
+            sales = sum(Sales,na.rm = T))%>% 
+  arrange(desc(Profit)) %>% 
+  mutate(margin = Profit/sales*100)
+
+category.profit
+```
+    
+    
+Dari data ini dapat diketahui bahwa dari nilai salesnya Category Technology memiliki nilai sales, profit dan margin yang paling tinggi. Namun ada keanehan untuk category Furniture dimana secara sales menempati posisi kedua terbesar namun memilik profit dan margin yang paling kecil. Tentunya ini merupakan sesuatu yang aneh dan mengindikasikan ada sesuatu yang perlu ditelusuri lebih dalam, sehingga dengan demikian fokus analisa berikutnya akan mengerucut ke category Funiture. 
+    
+    
+### Bagaimana Penjualan Furniture untuk tiap kelas Brandnya?
+
+Berikut merupakan data sales, profit dan margin dari penjualan category Furniture pada tiap kelas brandnya :
+
+```{r}
+category.profit <- retail%>% 
+   filter(Category == "Furniture") %>%
+  group_by(Brand) %>% 
+  summarise(Profit = sum(Profit), 
+            sales = sum(Sales))%>% 
+  arrange(desc(Profit)) %>% 
+mutate(margin = (Profit/sales)*100)
+
+category.profit
+```
+
+Dari data ini ternyata diketahui bahwa margin dari tiap kelas brand tidak terlalu berbeda jauh. Ketiga kelas brand tersebut memiliki margin yang kecil. 
+    
+    
+### Bagaimana Penjualan Furniture untuk tiap Segment pasarnya?
+    
+Berikut merupakan data sales, profit dan margin dari penjualan category Furniture pada tiap segment pasarnya :
+    
+```{r}
+category.profit <- retail%>% 
+   filter(Category == "Furniture") %>%
+   group_by(Segment) %>% 
+   summarise(Profit = sum(Profit), 
+            sales = sum(Sales))%>% 
+  arrange(desc(Profit)) %>% 
+mutate(margin = Profit/sales*100)
+
+category.profit
+```
+    
+Sama halnya dengan Brand, secara segmentnya pun margin dari tiap segmen tidak terlalu berbeda jauh. Walaupun pada segmen consumer memiliki margin yang paling kecil.
+    
+### Bagaimana Penjualan Furniture untuk tiap Region?
+
+Berikut merupakan data sales, profit dan margin dari penjualan category Furniture di tiap Region :
+    
+```{r}
+category.profit <- retail %>% 
+   filter(Category == "Furniture") %>%
+  group_by(Region) %>% 
+  summarise(Profit = sum(Profit), 
+            sales = sum(Sales))%>% 
+  arrange(desc(Profit)) %>% 
+mutate(margin = Profit/sales*100)
+
+category.profit
+```
+   
+Di region East nilai profitnya minus, hal ini berarti ada masalah yang serius dari penjualan product di region ini.
+   
+
+### Bagaimana Penjualan Furniture untuk tiap Subcategorynya?
+
+Berikut merupakan data sales, profit dan margin dari penjualan category Furniture pada tiap sub kategorynya :
+    
+```{r}
+category.profit <- retail %>% 
+   filter(Category == "Furniture") %>%
+  group_by(SubCategory) %>% 
+  summarise(Profit = sum(Profit), 
+            Sales = sum(Sales))%>% 
+  arrange(desc(Profit)) %>% 
+mutate(Margin = Profit/Sales*100)
+category.profit
+```
+    
+Dari data ini diketahui bahwa pada sub category Bookcases dan Tables memiliki profit dan margin yang minus, sedangkan untuk kedua category yang lainnya memiliki profit dan margin yang cukup baik. 
+
+Dengan demikian dapat diketahui bahwa penyebab kecilnya profit dan margin category Furniture adalah di sub category Bookcase dan Tables.
+
+Lalu apa yang menyebabkan pada sub category Bookcase dan Tables minus?
+
+#### SubCategory Bookcase
+
+```{r}
+category.profit <- retail %>% 
+   filter(SubCategory == "Bookcases") %>%
+  group_by(Discount) %>% 
+  summarise(Profit = sum(Profit), 
+            Sales = sum(Sales))%>% 
+  arrange(desc(Profit)) %>% 
+mutate(Margin = Profit/Sales*100)
+category.profit
+```
+
+Dari tabel ini diketahui bahwa penyebab utama profit dan margin minus adalah adanya Discount. Pemberian discount diatas 30 persen sudah membuat profit dan margin menjadi minus. 
+
+#### SubCategory Tables
+
+```{r}
+category.profit <- retail %>% 
+   filter(SubCategory == "Tables") %>%
+  group_by(Discount) %>% 
+  summarise(Profit = sum(Profit), 
+            Sales = sum(Sales))%>% 
+  arrange(desc(Profit)) %>% 
+mutate(Margin = Profit/Sales*100)
+category.profit
+```
+
+Sama seperti pada Subcategory Bookcase, pada tabble pun terjadi demikian bahwa penyebab utama profit dan margin minus adalah adanya Discount. Pemberian discount mulai dari 20 persen sudah membuat profit dan margin menjadi minus.
+
+## RESULT AND RECOMENDATION 
+
+Dari hasil analisa data dapat diketahui bahwa :
+
+1. Rendahnya nilai profit dan margin mayoritas disebabkan oleh Category Furniture terutama pada subcategory Bookcase dan Tabble dimana pada kedua category tersebut memiliki margin yang minus. 
+
+2. Penyebab margin minus ini adalah adanya pemberian discount. Pemberian discount banyak terjadi diarea East.
+
+Dari hasil analisa tersebut ada beberapa Rekomendasi yang perlu dilakukan :
+
+1. Terkait dengan point (1) Perlu dikaji lebih lanjut apakah Sub category Bookcase dan Tabble masih perlu untuk dikembangkan ataukah di Discontinue.
+
+2. Terkait dengan point (2) pemberian discount sebenarnya tidak akan menjadi masalah jika kita melakukan penentuan harga jual dengan baik. Sehingga dengan hal ini jika Bookcase dan Tabble masih perlu untuk dikembangkan perlu dilakukan perbaikan teknik penentuan harganya.
+

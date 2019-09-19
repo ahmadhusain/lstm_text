@@ -1,0 +1,413 @@
+---
+title: "Practice 1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#Pre Process Data
+## Set Working Directory
+`setwd` untuk mensetting working directory termasuk data input
+`getwd` untuk mencek working directory saat ini
+```{r}
+setwd("D:/2019/Training R/Project R")
+getwd()
+```
+## Read data from csv files
+Read file dan masukkan ke dalam data frame "POS"
+
+`read.csv` untuk membaca file csv
+```{r}
+POS <- read.csv("ZOHD_POS.CSV", header = FALSE, sep = ",")
+```
+
+`head` untuk menampilkan top (n) lines dari data frame
+
+```{r}
+head(POS,10)
+```
+
+### Data Cleansing
+#### Rename Kolom
+
+`rename` untuk rename kolom dari data frame
+
+Copy data ke POS_01 setelah rename kolom
+
+```{r}
+library(dplyr)
+library(lubridate)
+ POS_01 <- POS %>% 
+   rename("Order.Date" = V1,
+          "Article" = V2,
+          "Member.ID" = V3,
+          "Trans.Rec.Type" = V4,
+          "Trans.Type" = V5,
+          "Promo.Flag" = V6,
+          "Company" = V7,
+          "Store" = V8,
+          "Receipt.No" = V9,
+          "Hour.Sale" = V10,
+          "Time.Class" = V11,
+          "Article.Name" = V12,
+          "Department" = V13,
+          "Department.Name" = V14,
+          "Commodity" = V15,
+          "Commodity.Name" = V16,
+          "Class" = V17,
+          "Class.Name" = V18,
+          "Product.Group" = V19,
+          "Product.Group.Name" = V20,
+          "MOP" = V21,
+          "MOP.Name" = V22,
+          "Promotion" = V23,
+          "Promotion.Name" = V24,
+          "Base.Qty" = V25,
+          "Discount.Value" = V26,
+          "Sales.Qty" = V27,
+          "Sales.Value" = V28,
+          "Base.Unit" = V29,
+          "Currency" = V30,
+          "Sales.Unit" = V31)
+head(POS_01)
+```
+
+#### Merubah Data Class
+`str` untuk menampilkan class dari dataframe 
+
+```{r}
+str(POS_01)
+```
+
+`as.date` untuk merubah data class ke date
+
+`as.character` untuk merubah data class ke character
+
+`as.numeric` untuk merubah data class ke numeric
+
+`mutate` untuk merubah kolom dan menambah kolom
+```{r}
+POS_01 <- POS_01 %>% 
+  mutate(Order.Date = ymd(Order.Date),
+         Order.Month = month(Order.Date, label = TRUE),
+         Member.ID = as.character(Member.ID),
+         Trans.Rec.Type = as.factor(Trans.Rec.Type),
+         Trans.Type = as.factor(Trans.Type),
+         Receipt.No = as.character(Receipt.No),
+         Article = as.character(Article),
+         Article.Name = as.character(Article.Name),
+         Department = as.character(Department),
+         Department.Name = as.character(Department.Name),
+         Commodity = as.character(Commodity),
+         Commodity.Name = as.character(Commodity.Name),
+         Class = as.character(Class),
+         Class.Name = as.character(Class.Name),
+         Product.Group = as.character(Product.Group),
+         Product.Group.Name = as.character(Product.Group.Name),
+         MOP.Name = as.character(MOP.Name),
+         Promotion = as.character(Promotion),
+         Promotion.Name = as.character(Promotion.Name),
+         Discount.Value = as.numeric(Discount.Value),
+         Sales.Qty = as.numeric(Sales.Qty),
+         Sales.Value = as.numeric(Sales.Value) * 100)
+  # select(-c(Base.Qty,Base.Unit,Sales.Unit,Currency))
+         
+```
+
+#### Filter Data
+
+`Filter` untuk memfilter data berdasarkan kriteria tertentu
+
+POS_Sales untuk data penjualan per item dengan Trans.Type = 5001, dan Trans.Rec.Type = 1100
+
+POS_Payment untuk data payment per receipt dengan Trans.Type = 5001, dan Trans.Rec.Type = 1130
+
+```{r}
+POS_Sales <- POS_01 %>% 
+  filter(Trans.Type == "5001",
+         Trans.Rec.Type == "1100")
+
+POS_Payment <- POS_01 %>% 
+  filter(Trans.Type == "5001",
+         Trans.Rec.Type == "1130")
+```
+
+# Process Data
+## Analisa Basic Sales
+### Analisa Rata-Rata Basket Size 
+
+Berapakah rata-rata basket size di store tersebut per bulannya?
+
+Step 1 : POS_Store_Receipt untuk mendapatkan count receipt 
+
+```{r}
+POS_Store_Receipt <- POS_Sales %>% 
+  group_by (Store, Order.Month, Order.Date, Receipt.No, Member.ID) %>% 
+  summarise (Sum.Sales.Value = sum(Sales.Value), 
+             Total.Receipt = 1) %>% 
+  ungroup()
+head(POS_Store_Receipt)
+```
+
+Step 2 : POS_Store untuk aggregate lagi dari POS_Store_Receipt sehingga dapat menghitung Basket Size
+
+```{r}
+POS_Store <- POS_Store_Receipt %>% 
+  group_by(Store, Order.Month) %>% 
+  summarise(Sum.Sales.Value = sum(Sum.Sales.Value),
+            Total.Receipt = sum(Total.Receipt)) %>% 
+  mutate(Basket.Size = Sum.Sales.Value / Total.Receipt)
+head(POS_Store)
+```
+
+```{r}
+
+```
+
+
+## Analisa RFM
+
+Analisa RFM terbagi dari 3 nilai : 
+Recency : nilai max 10, min 0
+
+Frequency : nilai max 10, min 0
+
+Monetary : nilai max 10, min 0
+
+Nilai RFM secara keseluruhan max 30, min 0
+
+Setelah mendapatkan nilai RFM definisikan member tersebut ke dalam segmentasi member :
+Inactive : 0-5
+
+Below Average : 6-15
+
+Average : 16-20
+
+Above Average : 21-25
+
+Top : 27-30
+```{r}
+POS_RFM <- POS_Store_Receipt %>% 
+  mutate(Max.Date = max(Order.Date)) %>% 
+  group_by(Member.ID, Max.Date) %>% 
+  summarise(Monetary = sum(Sum.Sales.Value),
+            Frequency = n(),
+            Last.Order.Date = max(Order.Date)) %>% 
+  ungroup() %>% 
+  mutate(Recency = Max.Date - Last.Order.Date,
+         Recency = as.numeric(Recency)) %>% 
+  mutate(R.Value = case_when(Recency >= 300 ~ 0,
+                             Recency >=270 & Recency < 300  ~ 1,
+                             Recency >=240 & Recency < 270  ~ 2,
+                             Recency >=210 & Recency < 240  ~ 3,
+                             Recency >=180 & Recency < 210   ~ 4,
+                             Recency >=150 & Recency < 180  ~ 5,
+                             Recency >=120 & Recency < 150  ~ 6,
+                             Recency >=90 & Recency < 120   ~ 7,
+                             Recency >=60 & Recency < 90    ~ 8,
+                             Recency >=30 &Recency < 60     ~ 9,
+                             Recency <= 29 ~ 10),
+         F.Value = case_when(Frequency <= 1 ~ 0,
+                             Frequency >1 & Frequency <=5   ~ 1,
+                             Frequency >5 & Frequency <=9   ~ 2,
+                             Frequency >9 & Frequency <=11  ~ 3,
+                             Frequency >11 & Frequency <=13 ~ 4,
+                             Frequency >13 & Frequency <=15 ~ 5,
+                             Frequency >15 & Frequency <=19 ~ 6,
+                             Frequency >19 & Frequency <=29 ~ 7,
+                             Frequency >29 & Frequency <=39 ~ 8,
+                             Frequency >39 & Frequency <=49 ~ 9,
+                             Frequency >=50 ~ 10),
+         M.Value = case_when(Monetary <= 350000 ~ 0,
+                             Monetary > 350000 & Monetary <= 750000 ~ 1,
+                             Monetary > 750000 & Monetary <= 1000000 ~ 2,
+                             Monetary > 1000000 & Monetary <= 1500000 ~ 3,
+                             Monetary > 1500000 & Monetary <= 2500000 ~ 4,
+                             Monetary > 2500000 & Monetary <= 5000000 ~ 5,
+                             Monetary > 5000000 & Monetary <= 10000000 ~ 6,
+                             Monetary > 10000000 & Monetary <= 20000000 ~ 7,
+                             Monetary > 20000000 & Monetary <= 30000000 ~ 8,
+                             Monetary > 30000000 & Monetary <= 69999999 ~ 9,
+                             Monetary >= 70000000 ~ 10)) %>% 
+  mutate(RFM.Value = R.Value + F.Value + M.Value) %>% 
+  mutate(RFM.Segment = case_when(RFM.Value >= 0 & RFM.Value <= 5 ~ "Inactive",
+                                 RFM.Value > 5 & RFM.Value <= 15 ~ "Below Average",
+                                 RFM.Value > 15 & RFM.Value <=20 ~ "Average",
+                                 RFM.Value > 20 & RFM.Value <=26 ~ "Above Average",
+                                 RFM.Value > 26 & RFM.Value <=30 ~ "Top"),
+         RFM.Segment = as.factor(RFM.Segment)) %>% 
+  select(Member.ID,RFM.Segment,RFM.Value,R.Value, F.Value, M.Value,Recency, 
+         Frequency, Monetary, Max.Date ) %>% 
+  arrange(RFM.Value)
+  
+head(POS_RFM)
+```
+## Customer Segmentation from RFM
+
+1.Berapa total jumlah customer per segment nya?
+
+2.Berapa total transaksi per segmentnya?
+
+3.Berapa total sales value per segmentnya?
+
+4.Berapa average basket size per segmentnya?
+
+5.Berapa average RFM value per segmentnya?
+
+6.Berapa proporsi jumlah member per segmentnya?
+
+7.Berapa proporsi jumlah sales value per segmentnya?
+
+Untuk menjawab pertanyaan diatas, buat 1 DF POS_Segment `group_by` RFM.Segment, lalu `summarise` by total member, trx, sales, RFM.
+
+```{r}
+POS_Segment <- POS_RFM %>% 
+  group_by(RFM.Segment) %>% 
+  summarise(Total.Member = n(),
+            Total.Trx = sum(Frequency),
+            Total.Sales = sum(Monetary),
+            Total.RFM = sum(RFM.Value),
+            Avg.Basket.Size = Total.Sales / Total.Trx,
+            Avg.RFM.Value = Total.RFM / Total.Member) %>% 
+  ungroup() %>% 
+  mutate(Prop.Member = Total.Member / sum(Total.Member) * 100,
+         Prop.Sales = Total.Sales / sum(Total.Sales) * 100,
+         Prop.Member = round(Prop.Member,2),
+         Prop.Sales = round(Prop.Sales,2)) %>% 
+  select(RFM.Segment,Prop.Member, Prop.Sales,Total.Sales, Total.Member, Total.Trx, 
+        Avg.Basket.Size, Avg.RFM.Value) %>% 
+  arrange(desc(Avg.RFM.Value))
+
+POS_Segment
+```
+
+## Master Data Member
+
+Read data member untuk mendapatkan master data attribute dari member
+```{r}
+Member <- read.csv("ZO_MEMBER.CSV",sep=",", header = FALSE)
+
+```
+
+```{r}
+head(Member)
+```
+
+Rename kolom member
+```{r}
+ Member <- Member %>% 
+   rename("Member.ID" = V1,
+          "Cust.ID" = V2,
+          "Gender" = V3,
+          "Birth.Date" = V4,
+          "Marital.Status" = V5,
+          "Reg.Date" = V6,
+          "Exp.Date" = V7,
+          "Card.ID" = V8,
+          "Last.Trx.Date" = V9,
+          "Company" = V10,
+          "Store" = V11,
+          "Age" = V12,
+          "Sales.Org" = V13)
+```
+
+Ubah class dari kolom
+```{r}
+Member <-  Member %>% 
+  mutate(Member.ID = as.character(Member.ID),
+         Cust.ID = as.character(Cust.ID),
+         Gender = as.factor(Gender),
+         Gender = case_when(Gender == "1" ~ "Perempuan",
+                            TRUE ~ "Laki-Laki"),
+         Birth.Date = ymd(Birth.Date),
+         Marital.Status = as.factor(Marital.Status),
+         Marital.Status = case_when(Marital.Status == "1" ~ "Kawin",
+                                    Marital.Status == "2" ~ "Belum Kawin",
+                                    TRUE ~ "Others"),
+         Reg.Date = ymd(Reg.Date),
+         Exp.Date = ymd(Exp.Date),
+         Last.Trx.Date = ymd(Last.Trx.Date),
+         Card.ID = as.character(Card.ID),
+         Age = as.numeric(Age))
+
+str(Member)
+```
+
+## Analisa Inactive Member
+
+8. Berapa % Below Average member yang bertransaksi di Store tersebut register sebagai member di store tersebut juga?
+
+Join data RFM dan master member untuk mendapatkan informasi lebih dalam, `left_join` by Member.ID
+
+Filter hanya member yang ada nilai RFM nya saja, karena master data member untuk all company.
+```{r}
+Member_01 <- left_join(Member,POS_RFM, by = "Member.ID")
+
+Member_01 <- Member_01 %>% 
+  filter(RFM.Value != 0:30) %>% 
+  select(Member.ID, Store, Reg.Date, Birth.Date, Gender, Birth.Date,
+         RFM.Segment,RFM.Value,R.Value, F.Value,M.Value, Recency, Frequency, Monetary)
+  
+head(Member_01)
+```
+
+`Filter` df by RFM segment below average
+
+```{r}
+Member_02 <- left_join(POS_Store_Receipt,Member_01,by="Member.ID")
+Member_03 <- Member_02 %>% 
+  filter(RFM.Segment == "Below Average") %>% 
+  rename(Store.Trx = Store.x,
+         Store.Reg = Store.y) %>% 
+  group_by(Member.ID, Store.Trx, Store.Reg)
+head(Member_03)
+```
+
+Member origin adalah member yg register dan trx di toko yang sama, 
+Untuk itu tambah flag Count.Origin = 1 bila Store.Reg dan Store.Trx sama.
+
+```{r}
+Member_04 <- Member_03 %>% 
+  group_by(Member.ID, Store.Reg, Store.Trx) %>% 
+  summarise(Total.Receipt = sum(Total.Receipt),
+            Sum.Sales.Value = sum(Sum.Sales.Value)) %>% 
+  select(Member.ID, Store.Reg, Store.Trx, Total.Receipt) %>%
+  ungroup() %>% 
+  mutate(Counter = 1,
+         Store.Reg = as.character(Store.Reg),
+         Store.Trx = as.character(Store.Trx),
+         Count.Origin = case_when(Store.Reg == Store.Trx ~ 1,
+                                  TRUE ~ 0)) %>% 
+  arrange(Member.ID, desc(Total.Receipt))
+
+Member_04
+```
+Persentase Origin member di store A304 adalah 33.59%
+Persentase Origin member di store A321 adalah 43.25%
+
+```{r}
+Member_06 <- Member_04 %>% 
+  group_by(Store.Trx) %>% 
+  summarise(Count.Origin = sum(Count.Origin),
+            Counter = sum(Counter)) %>% 
+  ungroup() %>% 
+  mutate(Prop.Origin = Count.Origin / Counter * 100,
+         Prop.Origin = round(Prop.Origin, 2))
+Member_06
+
+```
+
+9. Preference Site untuk setiap member di below Average Segement?
+
+Analisa ini dibutuhkan untuk winback terhadap member, yang memberikan insight di store mana member tersebut sering bertransaksi, agar diberi promosi di preference store.
+
+`Distinct` untuk mengambil row pertama dimana di df Member_04 sudah disort berdasarkan Total.Receipt tertinggi, sehingga dalam df member.06 ini hanya unik per Member.ID.
+
+```{r}
+Member_05 <- Member_04 %>% 
+  distinct(Member_04, .keep_all = TRUE) %>% 
+  rename(Store.Preference = Store.Trx)
+Member_05
+```
+
